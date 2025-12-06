@@ -446,6 +446,8 @@ ggplot(fresh_sites,
 #####
 #Bats
 #####
+
+#Read Bat Data
 Bats <- read.csv("Bats.csv", header = TRUE)
 
 #Extract Region
@@ -465,6 +467,261 @@ bat_richness <- BatData %>%
     .groups = "drop"
   )
 
+######
+#Birds
+######
+
+#Read Bird Data
+Birds <- read.csv("Bird.csv", header = TRUE)
+
+#Create Regions and Inbound Columns
+library(dplyr)
+
+Birds <- Birds %>%
+  mutate(
+    Region   = ifelse(startsWith(eventID, "N"), "North", "South"),
+    InBounds = !grepl("OoB", eventID)     # OoB = out of bounds
+  )
+
+#In-bound Species Richness
+bird_richness <- Birds %>%
+  filter(InBounds, !is.na(scientificName)) %>%
+  group_by(eventID, Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+
+#Abundance
+bird_abundance <- Birds %>%
+  filter(InBounds) %>%
+  group_by(eventID, Region) %>%
+  summarise(
+    Abundance = sum(individualCount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+#Table
+bird_summary <- bird_richness %>%
+  left_join(bird_abundance, by = c("eventID", "Region"))
+
+#Plot abundance
+library(ggplot2)
+
+ggplot(bird_summary, aes(x = eventID, y = Abundance, fill = Region)) +
+  geom_col() +
+  scale_fill_manual(
+    values = c("North" = "#9B59B6",  # purple
+               "South" = "#27AE60")  # green
+  ) +
+  labs(
+    title = "Bird Abundance by Site (In-Bounds Only)",
+    x = "Site (eventID)",
+    y = "Abundance (Number of Individuals)",
+    fill = "Region"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+bird_abundance_region <- Birds %>%
+  filter(InBounds) %>%
+  group_by(Region) %>%
+  summarise(
+    TotalAbundance = sum(individualCount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+#Abundance Per Slope
+bird_abundance_region <- Birds %>%
+  filter(InBounds) %>%
+  group_by(Region) %>%
+  summarise(
+    TotalAbundance = sum(individualCount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+ggplot(bird_abundance_region, aes(x = Region, y = TotalAbundance, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(
+    values = c("North" = "#9370DB", "South" = "#2E8B57")
+  ) +
+  labs(
+    title = "Total Bird Abundance: North vs South",
+    x = "Region",
+    y = "Total Abundance"
+  ) +
+  theme_minimal(base_size = 14)
+
+#Species Richness
+bird_richness <- Birds %>%
+  mutate(
+    Region   = ifelse(startsWith(eventID, "N"), "North", "South"),
+    InBounds = !grepl("OoB", eventID)
+  ) %>%
+  filter(InBounds, !is.na(scientificName)) %>%
+  group_by(eventID, Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+
+#Plot Species richness (in-bounds only)
+library(ggplot2)
+
+ggplot(bird_richness, aes(x = eventID, y = SpeciesRichness, fill = Region)) +
+  geom_col() +
+  scale_fill_manual(
+    values = c(
+      "North" = "#9B59B6",  
+      "South" = "#27AE60"   
+    )
+  ) +
+  labs(
+    title = "Bird Species Richness by Site (In-Bounds Only)",
+    x = "Site (eventID)",
+    y = "Species Richness",
+    fill = "Region"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#By slope
+bird_region_richness <- Birds %>%
+  mutate(
+    Region   = ifelse(startsWith(eventID, "N"), "North", "South"),
+    InBounds = !grepl("OoB", eventID)
+  ) %>%
+  filter(InBounds, !is.na(scientificName)) %>%
+  group_by(Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+library(ggplot2)
+
+ggplot(bird_region_richness, aes(x = Region, y = SpeciesRichness, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(
+    values = c(
+      "North" = "#9370DB",  # purple
+      "South" = "#2E8B57"  # green
+    )
+  ) +
+  labs(
+    title = "Bird Species Richness: North vs South",
+    x = "Region",
+    y = "Species Richness"
+  ) +
+  theme_minimal(base_size = 14)
+
+#Richness for both in and out of bounds
+Birds <- Birds %>%
+  mutate(
+    Region   = ifelse(startsWith(eventID, "N"), "North", "South"),
+    Bounds   = ifelse(grepl("OoB", eventID), "OutOfBounds", "InBounds")
+  )
+bird_bounds_region_richness <- Birds %>%
+  filter(!is.na(scientificName)) %>% 
+  group_by(Region, Bounds) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+library(ggplot2)
+library(ggh4x)
+
+# complementary fill colours
+bounds_cols <- c(
+  "InBounds"    = "#2AA198",  # teal
+  "OutOfBounds" = "#DFA000"   # golden amber
+)
+
+ggplot(bird_bounds_region_richness,
+       aes(x = Bounds, y = SpeciesRichness, fill = Bounds)) +
+  
+  geom_col(width = 0.7) +
+  
+  facet_wrap2(
+    ~ Region,
+    nrow = 1,
+    strip = strip_themed(
+      background_x = list(
+        element_rect(fill = "#E6DAF5", colour = "#E6DAF5"),  # North (purple tint)
+        element_rect(fill = "#C8F7C5", colour = "#C8F7C5")   # South (green tint)
+      ),
+      text_x = list(
+        element_text(face = "bold"),
+        element_text(face = "bold")
+      )
+    )
+  ) +
+  
+  scale_fill_manual(values = bounds_cols) +
+  
+  labs(
+    title = "Bird Species Richness by Region and Bounds Category",
+    x = "",
+    y = "Species Richness",
+    fill = "Site Category"
+  ) +
+  
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    strip.text = element_text(size = 12)
+  )
+library(dplyr)
+library(ggplot2)
+
+# Abundance per slope
+bird_abundance_region <- Birds %>%
+  filter(InBounds) %>%
+  group_by(Region) %>%
+  summarise(
+    TotalAbundance = sum(individualCount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Richness per slope
+bird_region_richness <- Birds %>%
+  filter(InBounds, !is.na(scientificName)) %>%
+  group_by(Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+# Colours
+region_cols <- c("North" = "#9370DB", "South" = "#2E8B57")
+
+# Plot: richness per region
+p_bird_rich_region <- ggplot(bird_region_richness,
+                             aes(x = Region, y = SpeciesRichness, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(values = region_cols) +
+  labs(
+    title = "Bird species richness: North vs South",
+    x = "Region",
+    y = "Species richness"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+
+# Plot: abundance per region
+p_bird_abund_region <- ggplot(bird_abundance_region,
+                              aes(x = Region, y = TotalAbundance, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(values = region_cols) +
+  labs(
+    title = "Total bird abundance: North vs South",
+    x = "Region",
+    y = "Total abundance"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+library(patchwork)
+
+p_bird_rich_region | p_bird_abund_region
 
 library(ggplot2)
 
@@ -562,4 +819,261 @@ p_bat_activity <- ggplot(bat_activity_region,
   theme_minimal(base_size = 14) +
   theme(legend.position = "none")
 p_bat_rich | p_bat_activity
+
+######
+#Birds
+######
+
+#Read Bird Data
+Birds <- read.csv("Bird.csv", header = TRUE)
+
+#Create Regions and Inbound Columns
+library(dplyr)
+
+Birds <- Birds %>%
+  mutate(
+    Region   = ifelse(startsWith(eventID, "N"), "North", "South"),
+    InBounds = !grepl("OoB", eventID)     # OoB = out of bounds
+  )
+
+#In-bound Species Richness
+bird_richness <- Birds %>%
+  filter(InBounds, !is.na(scientificName)) %>%
+  group_by(eventID, Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+
+#Abundance
+bird_abundance <- Birds %>%
+  filter(InBounds) %>%
+  group_by(eventID, Region) %>%
+  summarise(
+    Abundance = sum(individualCount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+#Table
+bird_summary <- bird_richness %>%
+  left_join(bird_abundance, by = c("eventID", "Region"))
+
+#Plot abundance
+library(ggplot2)
+
+ggplot(bird_summary, aes(x = eventID, y = Abundance, fill = Region)) +
+  geom_col() +
+  scale_fill_manual(
+    values = c("North" = "#9B59B6",  # purple
+               "South" = "#27AE60")  # green
+  ) +
+  labs(
+    title = "Bird Abundance by Site (In-Bounds Only)",
+    x = "Site (eventID)",
+    y = "Abundance (Number of Individuals)",
+    fill = "Region"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+bird_abundance_region <- Birds %>%
+  filter(InBounds) %>%
+  group_by(Region) %>%
+  summarise(
+    TotalAbundance = sum(individualCount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+#Abundance Per Slope
+bird_abundance_region <- Birds %>%
+  filter(InBounds) %>%
+  group_by(Region) %>%
+  summarise(
+    TotalAbundance = sum(individualCount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+ggplot(bird_abundance_region, aes(x = Region, y = TotalAbundance, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(
+    values = c("North" = "#9370DB", "South" = "#2E8B57")
+  ) +
+  labs(
+    title = "Total Bird Abundance: North vs South",
+    x = "Region",
+    y = "Total Abundance"
+  ) +
+  theme_minimal(base_size = 14)
+
+#Species Richness
+bird_richness <- Birds %>%
+  mutate(
+    Region   = ifelse(startsWith(eventID, "N"), "North", "South"),
+    InBounds = !grepl("OoB", eventID)
+  ) %>%
+  filter(InBounds, !is.na(scientificName)) %>%
+  group_by(eventID, Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+
+#Plot Species richness (in-bounds only)
+library(ggplot2)
+
+ggplot(bird_richness, aes(x = eventID, y = SpeciesRichness, fill = Region)) +
+  geom_col() +
+  scale_fill_manual(
+    values = c(
+      "North" = "#9B59B6",  
+      "South" = "#27AE60"   
+    )
+  ) +
+  labs(
+    title = "Bird Species Richness by Site (In-Bounds Only)",
+    x = "Site (eventID)",
+    y = "Species Richness",
+    fill = "Region"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#By slope
+bird_region_richness <- Birds %>%
+  mutate(
+    Region   = ifelse(startsWith(eventID, "N"), "North", "South"),
+    InBounds = !grepl("OoB", eventID)
+  ) %>%
+  filter(InBounds, !is.na(scientificName)) %>%
+  group_by(Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+library(ggplot2)
+
+ggplot(bird_region_richness, aes(x = Region, y = SpeciesRichness, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(
+    values = c(
+      "North" = "#9370DB",  # purple
+      "South" = "#2E8B57"  # green
+    )
+  ) +
+  labs(
+    title = "Bird Species Richness: North vs South",
+    x = "Region",
+    y = "Species Richness"
+  ) +
+  theme_minimal(base_size = 14)
+
+#Richness for both in and out of bounds
+Birds <- Birds %>%
+  mutate(
+    Region   = ifelse(startsWith(eventID, "N"), "North", "South"),
+    Bounds   = ifelse(grepl("OoB", eventID), "OutOfBounds", "InBounds")
+  )
+bird_bounds_region_richness <- Birds %>%
+  filter(!is.na(scientificName)) %>% 
+  group_by(Region, Bounds) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+library(ggplot2)
+library(ggh4x)
+
+# complementary fill colours
+bounds_cols <- c(
+  "InBounds"    = "#2AA198",  # teal
+  "OutOfBounds" = "#DFA000"   # golden amber
+)
+
+ggplot(bird_bounds_region_richness,
+       aes(x = Bounds, y = SpeciesRichness, fill = Bounds)) +
+  
+  geom_col(width = 0.7) +
+  
+  facet_wrap2(
+    ~ Region,
+    nrow = 1,
+    strip = strip_themed(
+      background_x = list(
+        element_rect(fill = "#E6DAF5", colour = "#E6DAF5"),  # North (purple tint)
+        element_rect(fill = "#C8F7C5", colour = "#C8F7C5")   # South (green tint)
+      ),
+      text_x = list(
+        element_text(face = "bold"),
+        element_text(face = "bold")
+      )
+    )
+  ) +
+  
+  scale_fill_manual(values = bounds_cols) +
+  
+  labs(
+    title = "Bird Species Richness by Region and Bounds Category",
+    x = "",
+    y = "Species Richness",
+    fill = "Site Category"
+  ) +
+  
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    strip.text = element_text(size = 12)
+  )
+library(dplyr)
+library(ggplot2)
+
+# Abundance per slope
+bird_abundance_region <- Birds %>%
+  filter(InBounds) %>%
+  group_by(Region) %>%
+  summarise(
+    TotalAbundance = sum(individualCount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Richness per slope
+bird_region_richness <- Birds %>%
+  filter(InBounds, !is.na(scientificName)) %>%
+  group_by(Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+# Colours
+region_cols <- c("North" = "#9370DB", "South" = "#2E8B57")
+
+# Plot: richness per region
+p_bird_rich_region <- ggplot(bird_region_richness,
+                             aes(x = Region, y = SpeciesRichness, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(values = region_cols) +
+  labs(
+    title = "Bird species richness: North vs South",
+    x = "Region",
+    y = "Species richness"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+
+# Plot: abundance per region
+p_bird_abund_region <- ggplot(bird_abundance_region,
+                              aes(x = Region, y = TotalAbundance, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(values = region_cols) +
+  labs(
+    title = "Total bird abundance: North vs South",
+    x = "Region",
+    y = "Total abundance"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+library(patchwork)
+
+p_bird_rich_region | p_bird_abund_region
+
 
