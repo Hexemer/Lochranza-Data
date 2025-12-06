@@ -214,7 +214,9 @@ library(patchwork)
 Insects <- read.csv("Ground insects.csv", header = TRUE)
 
 # Flying invertebrates (moths, light traps)
-FlyingInsectF <- read.csv("Moths.csv", header = TRUE)
+FlyingInsect <- read.csv("Moths.csv", header = TRUE)
+
+FlyingInsect
 
 ###Separate the data by slope and method
 
@@ -238,7 +240,7 @@ GroundInverts <- Insects %>%
 
 
 ##Flying invertebrates (light traps, mostly moths)
-FlyingInverts <- FlyingInsectF %>%
+FlyingInverts <- FlyingInsect %>%
   distinct() %>%
   mutate(
     Block  = str_extract(eventID, "^[NS][0-9]"),              # e.g. N3, S3
@@ -364,6 +366,73 @@ overall_plot <-  (p_rich_overall | p_abund_overall)
 print(combined_plot)
 print(overall_plot)
 
+#Ground insects (pitfall + sweep net)
+GroundInverts <- Insects %>%
+  distinct() %>%
+  mutate(
+    Block  = str_extract(eventID, "^[NS][0-9]"),
+    Region = if_else(str_starts(Block, "N"), "North slope", "South slope"),
+    Method = case_when(
+      str_detect(eventID, "TIN") ~ "Sweep net",
+      str_detect(eventID, "TIP") ~ "Pitfall",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(
+    Block %in% c("N1", "N2", "N3", "S1", "S2", "S3"),
+    !is.na(Method)
+  ) %>%
+  select(eventID, Block, Region, Method, Order, Commonname, individualCount)
+
+#Flying invertebrates (moths)
+FlyingInverts <- FlyingInsect %>%
+  distinct() %>%
+  mutate(
+    Block  = str_extract(eventID, "^[NS][0-9]"),
+    Region = if_else(str_starts(Block, "N"), "North slope", "South slope"),
+    Method = "Moth trap"
+  ) %>%
+  filter(Block %in% c("N3", "S3")) %>%
+  select(eventID, Block, Region, Method, Order, Commonname, individualCount)
+
+#Combine
+Inverts_All <- bind_rows(GroundInverts, FlyingInverts)
+
+#Add taxonomic groupings
+inv_comp <- Inverts_All %>%
+  mutate(
+    Taxon_group = case_when(
+      Order %in% "Araneae"                       ~ "Spiders",
+      Order %in% "Ixodida"                       ~ "Ticks",
+      Order %in% "Diptera"                       ~ "Flies & crane flies",
+      Order %in% "Lepidoptera"                   ~ "Moths & caterpillars",
+      Order %in% c("Hemiptera", "Homoptera")     ~ "True bugs & aphids",
+      Order %in% "Hymenoptera"                   ~ "Ants & wasps",
+      TRUE                                       ~ "Other invertebrates"
+    )
+  ) %>%
+  group_by(Region, Taxon_group) %>%
+  summarise(
+    Abundance = sum(individualCount, na.rm = TRUE),
+    .groups   = "drop"
+  )
+
+#Side by side bar plots
+p_comp_abund <- ggplot(inv_comp,
+                       aes(x = Taxon_group,
+                           y = Abundance,
+                           fill = Region)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = slope_cols) +
+  labs(
+    x = "Taxonomic group",
+    y = "Total abundance (individuals)",
+    fill = "Slope",
+    title = "Invertebrate abundance by taxonomic group and slope"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p_comp_abund
 
 ##########################
 # Freshwater Invertebrates
