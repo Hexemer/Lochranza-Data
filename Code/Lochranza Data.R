@@ -1076,4 +1076,46 @@ library(patchwork)
 
 p_bird_rich_region | p_bird_abund_region
 
+########
+#Mammals
+########
+
+#Read the data
+Mammals <- read.csv("Mammals.csv", header = TRUE)
+
+#Keep only human observations + add Region
+library(dplyr)
+
+Mammals_human <- Mammals %>%
+  filter(basisOfRecord == "Humanobservation") %>%
+  mutate(
+    Region = ifelse(startsWith(eventID, "N"), "North", "South")
+  )
+
+#Species richness per slope
+mammal_region_richness <- Mammals_human %>%
+  filter(!is.na(scientificName)) %>%
+  group_by(Region) %>%
+  summarise(
+    SpeciesRichness = n_distinct(scientificName),
+    .groups = "drop"
+  )
+
+#Plot
+library(ggplot2)
+
+ggplot(mammal_region_richness, aes(x = Region, y = SpeciesRichness, fill = Region)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(
+    values = c(
+      "North" = "#9B59B6",  # purple
+      "South" = "#27AE60"   # green
+    )
+  ) +
+  labs(
+    title = "Mammal Species Richness (Human Observations Only)",
+    x = "Region",
+    y = "Species Richness"
+  ) +
+  theme_minimal(base_size = 14)
 
