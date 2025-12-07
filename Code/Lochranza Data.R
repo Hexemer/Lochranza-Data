@@ -7,13 +7,13 @@
 ########
 
 #Read the data
-Plants <- read.csv("Lochranza Plants.csv", header = TRUE)
+Plants <- read.csv("Plant Invasive.csv", header = TRUE)
 
 #Dplyr enables dataframe manipulation
+# (you only need to install packages once, but leaving your calls here)
 install.packages("dplyr")
 library(dplyr)
 library(stringr)
-
 
 #Subset quadrats by slope and location (High, Middle, Low)
 Plants2 <- Plants %>%
@@ -31,12 +31,15 @@ install.packages("ggplot2")
 library(ggplot2)
 
 palette_blocks <- c(
-  "N1" = "#6A5ACD",  
-  "N2" = "#836FFF",  
-  "N3" = "#9370DB",  
-  "S1" = "#2E8B57",  
-  "S2" = "#66CDAA",  
-  "S3" = "#98FB98"   
+  # NORTH (purple): light → dark
+  "N1" = "#CFC2EB",  # light purple
+  "N2" = "#9F87CF",  # medium purple
+  "N3" = "#6A4FA3",  # dark purple
+  
+  # SOUTH (green): light → dark
+  "S1" = "#CFE9DD",  # light green
+  "S2" = "#8EC4AE",  # medium green
+  "S3" = "#4F9C82"   # dark green
 )
 
 ggplot(Block_richness, aes(x = Block, y = SpeciesRichness, fill = Block)) +
@@ -44,9 +47,9 @@ ggplot(Block_richness, aes(x = Block, y = SpeciesRichness, fill = Block)) +
   scale_fill_manual(values = palette_blocks) +
   theme_minimal(base_size = 14) +
   labs(
-    x = "Quadrat Block",
+    x = "Quadrat Transect",
     y = "Species Richness",
-    title = "Plant Species Richness by Block"
+    title = "Plant Species Richness by Transect"
   ) +
   theme(
     legend.position = "none",
@@ -89,8 +92,8 @@ palette_invasive <- c(
   "FALSE" = "#A3C9A8"  
 )
 
-#Plot proportion of quadrats with/without invasives per transect
-ggplot(inv_summary, aes(x = Block, y = prop, fill = InvasivePresent)) +
+# *** NEW: save this plot as p_block_invasive (your annotations kept) ***
+p_block_invasive <- ggplot(inv_summary, aes(x = Block, y = prop, fill = InvasivePresent)) +
   geom_col(color = "black") +
   scale_y_continuous(labels = scales::percent_format()) +
   scale_fill_manual(
@@ -128,6 +131,18 @@ rich_region <- Plantsinvasive %>%
     .groups = "drop"
   )
 
+#Richness plot as p_region_richness
+p_region_richness <- ggplot(rich_region, aes(x = Region, y = SpeciesRichness, fill = Region)) +
+  geom_col() +
+  scale_fill_manual(values = c("North slope" = "#9370DB", "South slope" = "#2E8B57")) +
+  labs(
+    x = "",
+    y = "Total species richness",
+    title = "Plant species richness by slope"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+
 #Invasive presence per quadrat, then per Region
 inv_presence <- Plantsinvasive %>%
   group_by(eventID, Block, Region) %>%
@@ -141,25 +156,14 @@ inv_region <- inv_presence %>%
   group_by(Region) %>%
   mutate(prop = n / sum(n))
 
-#Plot richness: North vs South
-ggplot(rich_region, aes(x = Region, y = SpeciesRichness, fill = Region)) +
-  geom_col() +
-  scale_fill_manual(values = c("North slope" = "#9370DB", "South slope" = "#2E8B57")) +
-  labs(
-    x = "",
-    y = "Total species richness",
-    title = "Plant species richness by slope"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "none")
-
 #Plot proportion of quadrats containing invasive plants by overall slope
 palette_invasive <- c(
   "TRUE"  = "#E67E22",   
   "FALSE" = "#A3C9A8"    
 )
 
-ggplot(inv_region, aes(x = Region, y = prop, fill = InvasivePresent)) +
+# *** NEW: save this as p_region_invasive ***
+p_region_invasive <- ggplot(inv_region, aes(x = Region, y = prop, fill = InvasivePresent)) +
   geom_col(color = "black") +
   scale_y_continuous(labels = scales::percent_format()) +
   scale_fill_manual(
@@ -174,15 +178,15 @@ ggplot(inv_region, aes(x = Region, y = prop, fill = InvasivePresent)) +
   ) +
   theme_minimal(base_size = 14)
 
-#Block-level richness
+#Block-level richness (saved as object, using your annotations)
 p_block_richness <- ggplot(Block_richness, aes(x = Block, y = SpeciesRichness, fill = Block)) +
   geom_col() +
   scale_fill_manual(values = palette_blocks) +
   theme_minimal(base_size = 14) +
   labs(
-    x = "Quadrat Block",
+    x = "Quadrat Transect",
     y = "Species Richness",
-    title = "Plant Species Richness by Block"
+    title = "Plant Species Richness by Transect"
   ) +
   theme(
     legend.position = "none",
@@ -194,8 +198,12 @@ p_block_richness <- ggplot(Block_richness, aes(x = Block, y = SpeciesRichness, f
 #Transect invasive and slope invasive
 install.packages("patchwork")
 library(patchwork)
+
 p_block_richness + p_region_richness
 p_block_invasive + p_region_invasive
+
+
+
 
 #########################################
 # Invertebrate Analysis: Ground + Flying
@@ -398,17 +406,19 @@ FlyingInverts <- FlyingInsect %>%
 #Combine
 Inverts_All <- bind_rows(GroundInverts, FlyingInverts)
 
-#Add taxonomic groupings
 inv_comp <- Inverts_All %>%
   mutate(
-    Taxon_group = case_when(
-      Order %in% "Araneae"                       ~ "Spiders",
-      Order %in% "Ixodida"                       ~ "Ticks",
-      Order %in% "Diptera"                       ~ "Flies & crane flies",
-      Order %in% "Lepidoptera"                   ~ "Moths & caterpillars",
-      Order %in% c("Hemiptera", "Homoptera")     ~ "True bugs & aphids",
-      Order %in% "Hymenoptera"                   ~ "Ants & wasps",
-      TRUE                                       ~ "Other invertebrates"
+    # remove any leading/trailing spaces from Order
+    #Organize into taxon group
+    Order = stringr::str_trim(Order),
+    Taxon_group = dplyr::case_when(
+      Order == "Araneae"      ~ "Spiders",
+      Order == "Ixodida"      ~ "Ticks",
+      Order == "Diptera"      ~ "Flies & crane flies",
+      Order == "Lepidoptera"  ~ "Moths & caterpillars",
+      Order %in% c("Hemiptera", "Homoptera") ~ "True bugs & aphids",
+      Order == "Hymenoptera"  ~ "Ants & wasps",
+      TRUE                    ~ "Other invertebrates"
     )
   ) %>%
   group_by(Region, Taxon_group) %>%
@@ -416,6 +426,7 @@ inv_comp <- Inverts_All %>%
     Abundance = sum(individualCount, na.rm = TRUE),
     .groups   = "drop"
   )
+
 
 #Side by side bar plots
 p_comp_abund <- ggplot(inv_comp,
@@ -439,7 +450,7 @@ p_comp_abund
 ##########################
 
 # Read the data
-Freshwater <- read.csv("Freshwater.csv", header = TRUE)
+Freshwater <- read.csv("FreshwaterData.csv", header = TRUE)
 
 # Load packages
 library(dplyr)
@@ -459,6 +470,11 @@ FreshInvert <- Freshwater %>%
       str_detect(eventID, "^[NS]U") ~ "Upstream",
       str_detect(eventID, "^[NS]D") ~ "Downstream"
     )
+  ) %>%
+  # make Region and Position ordered factors
+  mutate(
+    Region   = factor(Region,   levels = c("North", "South")),
+    Position = factor(Position, levels = c("Upstream", "Downstream"))
   )
 
 # Summarise species richness by site
@@ -468,9 +484,6 @@ fresh_sites <- FreshInvert %>%
     SpeciesRichness = n_distinct(Commonname),
     .groups = "drop"
   )
-
-# Order regions
-fresh_sites$Region <- factor(fresh_sites$Region, levels = c("North", "South"))
 
 # Plot richness only
 ggplot(fresh_sites,
@@ -495,8 +508,8 @@ ggplot(fresh_sites,
   
   scale_fill_manual(
     values = c(
-      "Downstream" = "#66B2FF",
-      "Upstream"   = "#003B73"
+      "Upstream"   = "#8EC5FF",  # lighter blue
+      "Downstream" = "#255A96"   # darker blue
     )
   ) +
   
@@ -1177,8 +1190,8 @@ ggplot(mammal_region_richness, aes(x = Region, y = SpeciesRichness, fill = Regio
   geom_col(width = 0.6) +
   scale_fill_manual(
     values = c(
-      "North" = "#9B59B6",  # purple
-      "South" = "#27AE60"   # green
+      "North" = "#9370DB",  # purple
+      "South" = "#2E8B57"   # green
     )
   ) +
   labs(
